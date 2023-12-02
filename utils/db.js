@@ -9,14 +9,11 @@ class DBClient {
         process.env.DB_DATABASE || 'files_manager'
       }`,
     );
-    this.isConnected = false;
-    this.mongo.connect(() => {
-      this.isConnected = true;
-    });
+    this.mongo.connect();
   }
 
   isAlive() {
-    return this.isConnected;
+    return this.mongo.isConnected();
   }
 
   async nbUsers() {
