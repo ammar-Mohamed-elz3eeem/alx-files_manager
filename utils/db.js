@@ -20,16 +20,22 @@ class DBClient {
   }
 
   async nbUsers() {
-    const nbUsers = await this.mongo.db().collection('users').countDocuments();
+    const nbUsers = await this.mongo
+      .db()
+      .collection('users')
+      .countDocuments();
     return nbUsers;
   }
 
   async nbFiles() {
-    const nbFiles = await this.mongo.db().collection('files').countDocuments();
+    const nbFiles = await this.mongo
+      .db()
+      .collection('files')
+      .countDocuments();
     return nbFiles;
   }
 }
 
-const mongoClient = new DBClient();
+const dbClient = new DBClient();
 
-export default mongoClient;
+export default dbClient;
