@@ -11,11 +11,11 @@ class RedisClient {
     this._redis.on('error', (err) => {
       console.log(
         'Redis client failed to connect:',
-        err.message || err.toString()
+        err.message || err.toString(),
       );
       this.isConnected = false;
     });
-    this._redis.on('connect', (err) => {
+    this._redis.on('connect', () => {
       this.isConnected = true;
     });
   }
@@ -36,19 +36,16 @@ class RedisClient {
    * @returns {str | undefined}: value of that key in redis server
    */
   async get(key) {
-    return await promisify(this._redis.GET).bind(this._redis)(key);
+    const data = await promisify(this._redis.GET).bind(this._redis)(key);
+    return data;
   }
 
   async set(key, value, duration) {
-    return await promisify(this._redis.SETEX).bind(this._redis)(
-      key,
-      duration,
-      value
-    );
+    await promisify(this._redis.SETEX).bind(this._redis)(key, duration, value);
   }
 
   async del(key) {
-    return await promisify(this._redis.DEL).bind(this._redis)(key);
+    await promisify(this._redis.DEL).bind(this._redis)(key);
   }
 }
 

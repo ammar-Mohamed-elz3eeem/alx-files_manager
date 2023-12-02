@@ -1,5 +1,4 @@
 import MongoClient from 'mongodb/lib/mongo_client';
-import { promisify } from 'util';
 import envLoader from './env_loader';
 
 class DBClient {
@@ -8,10 +7,12 @@ class DBClient {
     this.mongo = new MongoClient(
       `mongodb://${process.env.DB_HOST}:${process.env.DB_PORT}/${
         process.env.DB_DATABASE || 'files_manager'
-      }`
+      }`,
     );
     this.isConnected = false;
-    this.mongo.connect(() => (this.isConnected = true));
+    this.mongo.connect(() => {
+      this.isConnected = true;
+    });
   }
 
   isAlive() {
@@ -19,11 +20,13 @@ class DBClient {
   }
 
   async nbUsers() {
-    return await this.mongo.db().collection('users').countDocuments();
+    const nbUsers = await this.mongo.db().collection('users').countDocuments();
+    return nbUsers;
   }
 
   async nbFiles() {
-    return await this.mongo.db().collection('files').countDocuments();
+    const nbFiles = await this.mongo.db().collection('files').countDocuments();
+    return nbFiles;
   }
 }
 
