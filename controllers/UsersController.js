@@ -10,7 +10,7 @@ export default class UserController {
       return response.status(400).json({ error: 'Missing email' });
     }
     if (!password) {
-      return response.status(400).json({ error: 'Missing email' });
+      return response.status(400).json({ error: 'Missing password' });
     }
 
     const user = await dbClient.mongo
@@ -29,6 +29,8 @@ export default class UserController {
 
     const insertedUserId = insertedUser.insertedId.toString();
 
-    return response.status(201).json({ email, id: insertedUserId });
+    return response
+      .status(201)
+      .json({ email: user.email, id: insertedUserId });
   }
 }
