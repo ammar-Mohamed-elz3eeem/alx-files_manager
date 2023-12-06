@@ -13,9 +13,7 @@ const MAX_PER_PAGE = 20;
 
 export default class FilesController {
   static async postUpload(req, res) {
-    const token = await rdClient.get(
-      `auth_${req.headers['x-token']}`,
-    );
+    const token = await rdClient.get(`auth_${req.headers['x-token']}`);
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -35,10 +33,7 @@ export default class FilesController {
     if (!fileObj.name) {
       return res.status(400).json({ error: 'Missing name' });
     }
-    if (
-      !fileObj.type ||
-      !['folder', 'file', 'image'].includes(fileObj.type)
-    ) {
+    if (!fileObj.type || !['folder', 'file', 'image'].includes(fileObj.type)) {
       return res.status(400).json({ error: 'Missing type' });
     }
     if (fileObj.type !== 'folder' && !req.body.data) {
@@ -53,18 +48,15 @@ export default class FilesController {
         return res.status(400).json({ error: 'Parent not found' });
       }
       if (folder.type !== 'folder') {
-        return res
-          .status(400)
-          .json({ error: 'Parent is not a folder' });
+        return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
     const folderPath = process.env.FOLDER_PATH
       ? process.env.FOLDER_PATH.trim()
       : '';
-    const baseDir =
-      folderPath.length > 0
-        ? folderPath
-        : joinFolders(tmpdir(), DEFAULT_FOLDER);
+    const baseDir = folderPath.length > 0
+      ? folderPath
+      : joinFolders(tmpdir(), DEFAULT_FOLDER);
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
       ? mongodb.ObjectId(fileObj.parentId)
@@ -72,10 +64,7 @@ export default class FilesController {
     await promisify(mkdir)(baseDir, { recursive: true });
     if (fileObj.type !== 'folder') {
       const filePath = joinFolders(baseDir, uuid4());
-      promisify(writeFile)(
-        filePath,
-        Buffer.from(req.body.data, 'base64'),
-      );
+      promisify(writeFile)(filePath, Buffer.from(req.body.data, 'base64'));
       fileObj.localPath = filePath;
     }
     const insertedFile = await dbClient.mongo
@@ -94,9 +83,7 @@ export default class FilesController {
   }
 
   static async getShow(req, res) {
-    const token = await rdClient.get(
-      `auth_${req.headers['x-token']}`,
-    );
+    const token = await rdClient.get(`auth_${req.headers['x-token']}`);
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -123,9 +110,7 @@ export default class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = await rdClient.get(
-      `auth_${req.headers['x-token']}`,
-    );
+    const token = await rdClient.get(`auth_${req.headers['x-token']}`);
     if (!token) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
