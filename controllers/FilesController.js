@@ -2,14 +2,7 @@ import mongodb from 'mongodb';
 import { tmpdir } from 'os';
 import { join as joinFolders } from 'path';
 import { promisify } from 'util';
-import {
-  mkdir,
-  writeFile,
-  existsSync,
-  statfsSync,
-  statSync,
-  realpathSync,
-} from 'fs';
+import { mkdir, writeFile, existsSync, stat, realpath } from 'fs';
 import { v4 as uuid4 } from 'uuid';
 import { contentType } from 'mime-types';
 import Queue from 'bull/lib/queue';
@@ -61,14 +54,14 @@ export default class FilesController {
         return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
-    const folderPath = process.env.FOLDER_PATH;
 
-    const folderExists = await promisify(existsSync)(folderPath);
-    const folderStats = await promisify(statfsSync)(folderPath);
+    const folderPath = process.env.FOLDER_PATH
+      ? process.env.FOLDER_PATH.trim()
+      : '';
 
-    const baseDir = folderExists && folderStats.files > 0
-        ? folderPath
-        : joinFolders(tmpdir(), DEFAULT_FOLDER);
+    const baseDir = folderPath
+      ? folderPath
+      : joinFolders(tmpdir(), DEFAULT_FOLDER);
 
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
@@ -304,19 +297,22 @@ export default class FilesController {
     if (file.type === 'folder') {
       return res.status(400).json({ error: "A folder doesn't have content" });
     }
+
     let filePath = file.localPath;
     if (req.query.size) {
       filePath = `${file.localPath}_${req.query.size}`;
     }
+
     if (existsSync(filePath)) {
-      const fileInfo = await promisify(statSync)(filePath);
+      const fileInfo = await promisify(stat)(filePath);
       if (!fileInfo.isFile()) {
         return res.status(404).json({ error: 'Not found' });
       }
     } else {
       return res.status(404).json({ error: 'Not found' });
     }
-    const absFilePath = await promisify(realpathSync)(file.localPath);
+    const absFilePath = await promisify(realpath)(filePath);
+    console.log(absFilePath);
     res.setHeader(
       'Content-Type',
       contentType(file.name) || 'text/plain; charset=utf-8',

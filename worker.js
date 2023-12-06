@@ -8,10 +8,16 @@ import dbClient from './utils/db';
 
 const fileQueue = new Queue('Thumbnails generator');
 
+export const generateThumbnail = async (path, size) => {
+  const buffer = await imageFunction(path, { width: size });
+  console.log(`Generating thumbnail: ${path}, size: ${size}`);
+  await promisify(writeFileSync)(`${path}_${size}`, buffer);
+};
+
 fileQueue.process(async (job, done) => {
   const userId = job.data.userId || null;
   const fileId = job.data.fileId || null;
-
+  console.log('Job Data', job.data);
   if (!userId) {
     throw new Error('Missing userId');
   }
@@ -28,12 +34,9 @@ fileQueue.process(async (job, done) => {
   if (!file) {
     throw new Error('File not found');
   }
-  await Promise.all(
-    [500, 250, 100].map(async (size) => {
-      const buffer = await imageFunction(file.localPath, { width: size });
-      console.log(`Generating thumbnail: ${file.localPath}, size: ${size}`);
-      promisify(writeFileSync)(`${file.localPath}_${size}`, buffer);
-    }),
-  );
-  done();
+  Promise.all(
+    [500, 250, 100].map((size) => generateThumbnail(file.localPath, size)),
+  ).then(() => {
+    done();
+  });
 });
