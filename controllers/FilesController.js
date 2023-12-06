@@ -2,7 +2,9 @@ import mongodb from 'mongodb';
 import { tmpdir } from 'os';
 import { join as joinFolders } from 'path';
 import { promisify } from 'util';
-import { mkdir, writeFile } from 'fs';
+import {
+  mkdir, writeFile, existsSync, statfsSync,
+} from 'fs';
 import { v4 as uuid4 } from 'uuid';
 
 import dbClient from '../utils/db';
@@ -51,16 +53,19 @@ export default class FilesController {
         return res.status(400).json({ error: 'Parent is not a folder' });
       }
     }
-    const folderPath = process.env.FOLDER_PATH
-      ? process.env.FOLDER_PATH.trim()
-      : '';
-    const baseDir = folderPath.length > 0
+    const folderPath = process.env.FOLDER_PATH;
+
+    const folderExists = await promisify(existsSync)(folderPath);
+    const folderStats = await promisify(statfsSync)(folderPath);
+
+    const baseDir = folderExists && folderStats.files > 0
       ? folderPath
       : joinFolders(tmpdir(), DEFAULT_FOLDER);
+
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
       ? mongodb.ObjectId(fileObj.parentId)
-      : '0';
+      : 0;
     await promisify(mkdir)(baseDir, { recursive: true });
     if (fileObj.type !== 'folder') {
       const filePath = joinFolders(baseDir, uuid4());
@@ -74,7 +79,6 @@ export default class FilesController {
       .db()
       .collection('files')
       .insertOne(fileObj);
-    console.log(insertedFile);
     return res.status(200).json({
       id: insertedFile.insertedId.toString(),
       userId: fileObj.userId,
