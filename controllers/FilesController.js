@@ -64,10 +64,9 @@ export default class FilesController {
     const folderExists = await promisify(existsSync)(folderPath);
     const folderStats = await promisify(statfsSync)(folderPath);
 
-    const baseDir =
-      folderExists && folderStats.files > 0
-        ? folderPath
-        : joinFolders(tmpdir(), DEFAULT_FOLDER);
+    const baseDir = folderExists && folderStats.files > 0
+      ? folderPath
+      : joinFolders(tmpdir(), DEFAULT_FOLDER);
 
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
