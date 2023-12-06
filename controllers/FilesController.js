@@ -3,9 +3,15 @@ import { tmpdir } from 'os';
 import { join as joinFolders } from 'path';
 import { promisify } from 'util';
 import {
-  mkdir, writeFile, existsSync, statfsSync,
+  mkdir,
+  writeFile,
+  existsSync,
+  statfsSync,
+  statSync,
+  realpathSync,
 } from 'fs';
 import { v4 as uuid4 } from 'uuid';
+import { contentType } from 'mime-types';
 
 import dbClient from '../utils/db';
 import rdClient from '../utils/redis';
@@ -58,9 +64,10 @@ export default class FilesController {
     const folderExists = await promisify(existsSync)(folderPath);
     const folderStats = await promisify(statfsSync)(folderPath);
 
-    const baseDir = folderExists && folderStats.files > 0
-      ? folderPath
-      : joinFolders(tmpdir(), DEFAULT_FOLDER);
+    const baseDir =
+      folderExists && folderStats.files > 0
+        ? folderPath
+        : joinFolders(tmpdir(), DEFAULT_FOLDER);
 
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
@@ -264,5 +271,45 @@ export default class FilesController {
       isPublic: false,
       parentId: document.parentId === '0' ? 0 : document.parentId.toString(),
     });
+  }
+
+  static async getFile(req, res) {
+    const file = await dbClient.mongo
+      .db()
+      .collection('files')
+      .findOne({ _id: mongodb.ObjectId(req.params.id) });
+    if (!file) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    if (file.isPublic !== true) {
+      const token = await rdClient.get(`auth_${req.headers['x-token']}`);
+      if (!token) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+      const user = await dbClient.mongo
+        .db()
+        .collection('users')
+        .findOne({ _id: mongodb.ObjectId(token) });
+      if (!user || user._id.toString() !== file.userId.toString()) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+    }
+    if (file.type === 'folder') {
+      return res.status(400).json({ error: 'A folder doesn\'t have content' });
+    }
+    if (existsSync(file.localPath)) {
+      const fileInfo = await promisify(statSync)(file.localPath);
+      if (!fileInfo.isFile()) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+    } else {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const absFilePath = await promisify(realpathSync)(file.localPath);
+    res.setHeader(
+      'Content-Type',
+      contentType(file.name) || 'text/plain; charset=utf-8',
+    );
+    return res.status(200).sendFile(absFilePath);
   }
 }
