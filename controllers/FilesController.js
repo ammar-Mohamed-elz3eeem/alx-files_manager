@@ -12,12 +12,14 @@ import {
 } from 'fs';
 import { v4 as uuid4 } from 'uuid';
 import { contentType } from 'mime-types';
+import Queue from 'bull/lib/queue';
 
 import dbClient from '../utils/db';
 import rdClient from '../utils/redis';
 
 const DEFAULT_FOLDER = 'files_manager';
 const MAX_PER_PAGE = 20;
+const fileQueue = new Queue('Thumbnails generator');
 
 export default class FilesController {
   static async postUpload(req, res) {
@@ -65,8 +67,8 @@ export default class FilesController {
     const folderStats = await promisify(statfsSync)(folderPath);
 
     const baseDir = folderExists && folderStats.files > 0
-      ? folderPath
-      : joinFolders(tmpdir(), DEFAULT_FOLDER);
+        ? folderPath
+        : joinFolders(tmpdir(), DEFAULT_FOLDER);
 
     fileObj.userId = mongodb.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
@@ -85,6 +87,12 @@ export default class FilesController {
       .db()
       .collection('files')
       .insertOne(fileObj);
+    if (fileObj.type === 'image') {
+      fileQueue.add({
+        userId: token,
+        fileId: insertedFile.insertedId.toString(),
+      });
+    }
     return res.status(200).json({
       id: insertedFile.insertedId.toString(),
       userId: fileObj.userId,
@@ -294,10 +302,14 @@ export default class FilesController {
       }
     }
     if (file.type === 'folder') {
-      return res.status(400).json({ error: 'A folder doesn\'t have content' });
+      return res.status(400).json({ error: "A folder doesn't have content" });
     }
-    if (existsSync(file.localPath)) {
-      const fileInfo = await promisify(statSync)(file.localPath);
+    let filePath = file.localPath;
+    if (req.query.size) {
+      filePath = `${file.localPath}_${req.query.size}`;
+    }
+    if (existsSync(filePath)) {
+      const fileInfo = await promisify(statSync)(filePath);
       if (!fileInfo.isFile()) {
         return res.status(404).json({ error: 'Not found' });
       }
