@@ -1,7 +1,8 @@
 import sha1 from 'sha1';
-import dbClient from '../utils/db';
-import redisClient from '../utils/redis';
 import { ObjectId } from 'mongodb';
+
+import dbClient from '../utils/db';
+import rdClient from '../utils/redis';
 
 export default class UserController {
   static async postNew(request, response) {
@@ -35,7 +36,7 @@ export default class UserController {
   }
 
   static async getMe(request, response) {
-    const userToken = await redisClient.get(
+    const userToken = await rdClient.get(
       `auth_${request.headers['x-token']}`,
     );
     if (userToken) {
@@ -46,6 +47,6 @@ export default class UserController {
       response.json({ id: user._id, email: user.email });
       return;
     }
-    return response.status(401).json({ error: 'Unauthorized' });
+    response.status(401).json({ error: 'Unauthorized' });
   }
 }
