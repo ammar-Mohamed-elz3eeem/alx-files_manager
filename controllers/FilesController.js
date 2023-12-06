@@ -64,7 +64,10 @@ export default class FilesController {
     await promisify(mkdir)(baseDir, { recursive: true });
     if (fileObj.type !== 'folder') {
       const filePath = joinFolders(baseDir, uuid4());
-      promisify(writeFile)(filePath, Buffer.from(req.body.data, 'base64'));
+      await promisify(writeFile)(
+        filePath,
+        Buffer.from(req.body.data, 'base64'),
+      );
       fileObj.localPath = filePath;
     }
     const insertedFile = await dbClient.mongo
@@ -161,5 +164,101 @@ export default class FilesController {
       ])
       .toArray();
     return res.status(200).json(files);
+  }
+
+  static async putPublish(req, res) {
+    const token = await rdClient.get(`auth_${req.headers['x-token']}`);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await dbClient.mongo
+      .db()
+      .collection('users')
+      .findOne({ _id: mongodb.ObjectId(token) });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const document = await dbClient.mongo
+      .db()
+      .collection('files')
+      .findOne({
+        $and: [
+          { userId: mongodb.ObjectId(token) },
+          { _id: mongodb.ObjectId(req.params.id) },
+        ],
+      });
+    if (!document) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    await dbClient.mongo
+      .db()
+      .collection('files')
+      .updateOne(
+        {
+          userId: mongodb.ObjectId(token),
+          _id: mongodb.ObjectId(req.params.id),
+        },
+        {
+          $set: {
+            isPublic: true,
+          },
+        },
+      );
+    return res.status(200).json({
+      id: req.params.id,
+      userId: token,
+      name: document.name,
+      type: document.type,
+      isPublic: true,
+      parentId: document.parentId === '0' ? 0 : document.parentId.toString(),
+    });
+  }
+
+  static async putUnpublish(req, res) {
+    const token = await rdClient.get(`auth_${req.headers['x-token']}`);
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const user = await dbClient.mongo
+      .db()
+      .collection('users')
+      .findOne({ _id: mongodb.ObjectId(token) });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const document = await dbClient.mongo
+      .db()
+      .collection('files')
+      .findOne({
+        $and: [
+          { userId: mongodb.ObjectId(token) },
+          { _id: mongodb.ObjectId(req.params.id) },
+        ],
+      });
+    if (!document) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    await dbClient.mongo
+      .db()
+      .collection('files')
+      .updateOne(
+        {
+          userId: mongodb.ObjectId(token),
+          _id: mongodb.ObjectId(req.params.id),
+        },
+        {
+          $set: {
+            isPublic: false,
+          },
+        },
+      );
+    return res.status(200).json({
+      id: req.params.id,
+      userId: token,
+      name: document.name,
+      type: document.type,
+      isPublic: false,
+      parentId: document.parentId === '0' ? 0 : document.parentId.toString(),
+    });
   }
 }
