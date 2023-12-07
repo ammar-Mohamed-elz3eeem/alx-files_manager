@@ -2,7 +2,9 @@ import mongodb from 'mongodb/lib/core';
 import { tmpdir } from 'os';
 import { join as joinFolders } from 'path';
 import { promisify } from 'util';
-import { mkdir, writeFile, existsSync, stat, realpath } from 'fs';
+import {
+  mkdir, writeFile, existsSync, stat, realpath,
+} from 'fs';
 import { v4 as uuid4 } from 'uuid';
 import { contentType } from 'mime-types';
 import Queue from 'bull/lib/queue';
@@ -59,9 +61,7 @@ export default class FilesController {
       ? process.env.FOLDER_PATH.trim()
       : '';
 
-    const baseDir = folderPath
-      ? folderPath
-      : joinFolders(tmpdir(), DEFAULT_FOLDER);
+    const baseDir = folderPath || joinFolders(tmpdir(), DEFAULT_FOLDER);
 
     fileObj.userId = new mongodb.BSON.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
@@ -113,7 +113,7 @@ export default class FilesController {
       .collection('files')
       .findOne({
         _id: new mongodb.BSON.ObjectId(
-          req.params.id && req.params.id.length == 24
+          req.params.id && req.params.id.length === 24
             ? req.params.id
             : Buffer.alloc(12, 0),
         ),
@@ -155,8 +155,7 @@ export default class FilesController {
       userId: user._id,
     };
     if (parentId !== '0' || parentId !== 0) {
-      filesFilter.parentId =
-        parentId.length === 24 ? new mongodb.BSON.ObjectId(parentId) : 0;
+      filesFilter.parentId = parentId.length === 24 ? new mongodb.BSON.ObjectId(parentId) : 0;
     }
     const files = await dbClient.mongo
       .db()

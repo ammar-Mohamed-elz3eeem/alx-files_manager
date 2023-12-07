@@ -8,7 +8,7 @@ import dbClient from './utils/db';
 
 const fileQueue = new Queue('Thumbnails generator');
 
-export const generateThumbnail = async (path, size) => {
+const generateThumbnail = async (path, size) => {
   const buffer = await imageFunction(path, { width: size });
   console.log(`Generating thumbnail: ${path}, size: ${size}`);
   await promisify(writeFileSync)(`${path}_${size}`, buffer);
