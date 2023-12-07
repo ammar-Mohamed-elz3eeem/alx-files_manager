@@ -8,3 +8,5 @@ app.use(Express.json({ limit: '200mb' }));
 app.use(routes);
 
 app.listen(PORT);
+
+export default app;

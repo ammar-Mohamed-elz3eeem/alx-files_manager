@@ -1,4 +1,4 @@
-import mongodb from 'mongodb';
+import mongodb from 'mongodb/lib/core';
 import { tmpdir } from 'os';
 import { join as joinFolders } from 'path';
 import { promisify } from 'util';
@@ -23,7 +23,7 @@ export default class FilesController {
     const user = await dbClient.mongo
       .db()
       .collection('users')
-      .findOne({ _id: mongodb.ObjectId(token) });
+      .findOne({ _id: new mongodb.BSON.ObjectId(token) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -46,7 +46,7 @@ export default class FilesController {
       const folder = await dbClient.mongo
         .db()
         .collection('files')
-        .findOne({ _id: mongodb.ObjectId(fileObj.parentId) });
+        .findOne({ _id: new mongodb.BSON.ObjectId(fileObj.parentId) });
       if (!folder) {
         return res.status(400).json({ error: 'Parent not found' });
       }
@@ -63,9 +63,9 @@ export default class FilesController {
       ? folderPath
       : joinFolders(tmpdir(), DEFAULT_FOLDER);
 
-    fileObj.userId = mongodb.ObjectId(user._id.toString());
+    fileObj.userId = new mongodb.BSON.ObjectId(user._id.toString());
     fileObj.parentId = fileObj.parentId
-      ? mongodb.ObjectId(fileObj.parentId)
+      ? new mongodb.BSON.ObjectId(fileObj.parentId)
       : 0;
     await promisify(mkdir)(baseDir, { recursive: true });
     if (fileObj.type !== 'folder') {
@@ -86,7 +86,7 @@ export default class FilesController {
         fileId: insertedFile.insertedId.toString(),
       });
     }
-    return res.status(200).json({
+    return res.status(201).json({
       id: insertedFile.insertedId.toString(),
       userId: fileObj.userId,
       name: fileObj.name,
@@ -104,23 +104,35 @@ export default class FilesController {
     const user = await dbClient.mongo
       .db()
       .collection('users')
-      .findOne({ _id: mongodb.ObjectId(token) });
+      .findOne({ _id: new mongodb.BSON.ObjectId(token) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const document = await dbClient.mongo
+    const file = await dbClient.mongo
       .db()
       .collection('files')
       .findOne({
-        $and: [
-          { userId: mongodb.ObjectId(token) },
-          { _id: mongodb.ObjectId(req.params.id) },
-        ],
+        _id: new mongodb.BSON.ObjectId(
+          req.params.id && req.params.id.length == 24
+            ? req.params.id
+            : Buffer.alloc(12, 0),
+        ),
+        userId: user._id,
       });
-    if (!document) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
-    return res.status(200).json({ ...document });
+    return res.status(200).json({
+      id: req.params.id,
+      name: file.name,
+      userId: file.userId.toString(),
+      parentId:
+        file.parentId === '0' || file.parentId === 0
+          ? 0
+          : file.parentId.toString(),
+      type: file.type,
+      isPublic: file.isPublic,
+    });
   }
 
   static async getIndex(req, res) {
@@ -131,7 +143,7 @@ export default class FilesController {
     const user = await dbClient.mongo
       .db()
       .collection('users')
-      .findOne({ _id: mongodb.ObjectId(token) });
+      .findOne({ _id: new mongodb.BSON.ObjectId(token) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -142,8 +154,9 @@ export default class FilesController {
     const filesFilter = {
       userId: user._id,
     };
-    if (parentId !== '0') {
-      filesFilter.parentId = mongodb.ObjectId(parentId);
+    if (parentId !== '0' || parentId !== 0) {
+      filesFilter.parentId =
+        parentId.length === 24 ? new mongodb.BSON.ObjectId(parentId) : 0;
     }
     const files = await dbClient.mongo
       .db()
@@ -185,20 +198,21 @@ export default class FilesController {
     const user = await dbClient.mongo
       .db()
       .collection('users')
-      .findOne({ _id: mongodb.ObjectId(token) });
+      .findOne({ _id: new mongodb.BSON.ObjectId(token) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const document = await dbClient.mongo
+    const file = await dbClient.mongo
       .db()
       .collection('files')
       .findOne({
-        $and: [
-          { userId: mongodb.ObjectId(token) },
-          { _id: mongodb.ObjectId(req.params.id) },
-        ],
+        userId: new mongodb.BSON.ObjectId(token),
+        _id:
+          req.params.id && req.params.id.length === 24
+            ? new mongodb.BSON.ObjectId(req.params.id)
+            : 0,
       });
-    if (!document) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
     await dbClient.mongo
@@ -206,8 +220,8 @@ export default class FilesController {
       .collection('files')
       .updateOne(
         {
-          userId: mongodb.ObjectId(token),
-          _id: mongodb.ObjectId(req.params.id),
+          userId: new mongodb.BSON.ObjectId(token),
+          _id: new mongodb.BSON.ObjectId(req.params.id),
         },
         {
           $set: {
@@ -218,10 +232,10 @@ export default class FilesController {
     return res.status(200).json({
       id: req.params.id,
       userId: token,
-      name: document.name,
-      type: document.type,
+      name: file.name,
+      type: file.type,
       isPublic: true,
-      parentId: document.parentId === '0' ? 0 : document.parentId.toString(),
+      parentId: file.parentId === 0 ? 0 : file.parentId.toString(),
     });
   }
 
@@ -233,20 +247,25 @@ export default class FilesController {
     const user = await dbClient.mongo
       .db()
       .collection('users')
-      .findOne({ _id: mongodb.ObjectId(token) });
+      .findOne({ _id: new mongodb.BSON.ObjectId(token) });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const document = await dbClient.mongo
+    const file = await dbClient.mongo
       .db()
       .collection('files')
       .findOne({
         $and: [
-          { userId: mongodb.ObjectId(token) },
-          { _id: mongodb.ObjectId(req.params.id) },
+          { userId: new mongodb.BSON.ObjectId(token) },
+          {
+            _id:
+              req.params.id && req.params.id.length === 24
+                ? new mongodb.BSON.ObjectId(req.params.id)
+                : 0,
+          },
         ],
       });
-    if (!document) {
+    if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
     await dbClient.mongo
@@ -254,8 +273,8 @@ export default class FilesController {
       .collection('files')
       .updateOne(
         {
-          userId: mongodb.ObjectId(token),
-          _id: mongodb.ObjectId(req.params.id),
+          userId: new mongodb.BSON.ObjectId(token),
+          _id: new mongodb.BSON.ObjectId(req.params.id),
         },
         {
           $set: {
@@ -266,10 +285,10 @@ export default class FilesController {
     return res.status(200).json({
       id: req.params.id,
       userId: token,
-      name: document.name,
-      type: document.type,
+      name: file.name,
+      type: file.type,
       isPublic: false,
-      parentId: document.parentId === '0' ? 0 : document.parentId.toString(),
+      parentId: file.parentId === 0 ? 0 : file.parentId.toString(),
     });
   }
 
@@ -277,7 +296,12 @@ export default class FilesController {
     const file = await dbClient.mongo
       .db()
       .collection('files')
-      .findOne({ _id: mongodb.ObjectId(req.params.id) });
+      .findOne({
+        _id:
+          req.params.id && req.params.id.length === 24
+            ? new mongodb.BSON.ObjectId(req.params.id)
+            : 0,
+      });
     if (!file) {
       return res.status(404).json({ error: 'Not found' });
     }
@@ -289,7 +313,7 @@ export default class FilesController {
       const user = await dbClient.mongo
         .db()
         .collection('users')
-        .findOne({ _id: mongodb.ObjectId(token) });
+        .findOne({ _id: new mongodb.BSON.ObjectId(token) });
       if (!user || user._id.toString() !== file.userId.toString()) {
         return res.status(404).json({ error: 'Not found' });
       }
