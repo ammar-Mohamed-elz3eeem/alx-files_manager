@@ -3,6 +3,9 @@ import { ObjectId } from 'mongodb';
 
 import dbClient from '../utils/db';
 import rdClient from '../utils/redis';
+import Queue from 'bull/lib/queue';
+
+const userQueue = new Queue('welcome user');
 
 export default class UserController {
   static async postNew(request, response) {
@@ -31,14 +34,13 @@ export default class UserController {
       .insertOne({ email, password: sha1(password) });
 
     const insertedUserId = insertedUser.insertedId.toString();
+    userQueue.add({ userId: insertedUserId });
 
     return response.status(201).json({ email, id: insertedUserId });
   }
 
   static async getMe(request, response) {
-    const userToken = await rdClient.get(
-      `auth_${request.headers['x-token']}`,
-    );
+    const userToken = await rdClient.get(`auth_${request.headers['x-token']}`);
     if (userToken) {
       const user = await dbClient.mongo
         .db()

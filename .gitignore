@@ -3,3 +3,4 @@ main.js
 *.rdb
 *.py
 *.png
+.en*
